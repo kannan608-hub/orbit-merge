@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#241a44"/>
+      <stop offset="70%" stop-color="#0a0716"/>
+    </radialGradient>
+    <radialGradient id="orbBig" cx="38%" cy="32%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#b06bff"/>
+      <stop offset="100%" stop-color="#6b2fd0"/>
+    </radialGradient>
+    <radialGradient id="orbMid" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#6bd6ff"/>
+      <stop offset="100%" stop-color="#2f8fc7"/>
+    </radialGradient>
+    <radialGradient id="orbSmall" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#ffd06b"/>
+      <stop offset="100%" stop-color="#d69a2f"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="332" cy="672" r="118" fill="url(#orbSmall)"/>
+  <circle cx="620" cy="700" r="150" fill="url(#orbMid)"/>
+  <circle cx="500" cy="420" r="260" fill="url(#orbBig)"/>
+  <circle cx="500" cy="420" r="260" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="6"/>
+</svg>

@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Orbit Merge</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: radial-gradient(ellipse at top, #1b1330 0%, #0a0716 70%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: none;
+  }
+  #app {
+    position: relative;
+    max-width: 480px;
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px 6px;
+    color: #f2eefe;
+    z-index: 5;
+  }
+  .hud-block { text-align: center; }
+  .hud-label { font-size: 11px; letter-spacing: 1px; opacity: 0.6; text-transform: uppercase; }
+  .hud-value { font-size: 22px; font-weight: 700; }
+  #nextWrap { display: flex; flex-direction: column; align-items: center; }
+  #nextCanvas { width: 46px; height: 46px; }
+  #novaBtn {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: linear-gradient(145deg,#3a2d6e,#211547);
+    border: 2px solid #6a4fd6; color: #d9c9ff;
+    font-size: 20px; display:flex; align-items:center; justify-content:center;
+    position: relative; opacity: 0.4; transition: opacity .2s, transform .15s;
+  }
+  #novaBtn.ready { opacity: 1; box-shadow: 0 0 18px #8a5cff; }
+  #novaBtn.ready:active { transform: scale(0.9); }
+  #novaFill {
+    position:absolute; bottom:0; left:0; right:0; height:0%;
+    background: rgba(138,92,255,0.35); border-radius: 0 0 27px 27px; pointer-events:none;
+  }
+  #canvasWrap { position: relative; flex: 1; min-height: 0; }
+  canvas#game { position: absolute; top:0; left:0; width:100%; height:100%; display:block; }
+  #overlay {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(8,5,20,0.88); color: #f2eefe; padding: 24px; z-index: 20;
+  }
+  #overlay.show { display: flex; }
+  #overlay h1 { font-size: 30px; margin: 0 0 4px; }
+  #overlay p { opacity: 0.75; margin: 4px 0 20px; font-size: 14px; }
+  #overlay .score { font-size: 46px; font-weight: 800; margin: 8px 0; }
+  #overlay .best { font-size: 13px; opacity: 0.6; margin-bottom: 24px; }
+  button.primary {
+    background: linear-gradient(135deg,#8a5cff,#5c3bd6); color: white; border: none;
+    padding: 14px 36px; border-radius: 30px; font-size: 16px; font-weight: 700;
+    box-shadow: 0 8px 24px rgba(138,92,255,0.35);
+  }
+  button.primary:active { transform: scale(0.96); }
+  #comboPopup {
+    position: absolute; font-weight: 800; color: #ffd76a; pointer-events: none;
+    text-shadow: 0 0 8px rgba(255,215,106,0.8); z-index: 15; opacity: 0;
+    font-size: 20px;
+  }
+  #startScreen {
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#f2eefe; text-align:center; z-index: 25; background: radial-gradient(ellipse at top, #1b1330 0%, #0a0716 70%);
+  }
+  #startScreen h1 { font-size: 34px; background: linear-gradient(135deg,#a98bff,#ff9de2); -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:6px;}
+  #startScreen p { opacity:0.7; font-size:14px; max-width:280px; line-height:1.5; margin-bottom: 28px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-block">
+      <div class="hud-label">Score</div>
+      <div class="hud-value" id="scoreVal">0</div>
+    </div>
+    <div id="nextWrap">
+      <div class="hud-label">Next</div>
+      <canvas id="nextCanvas" width="46" height="46"></canvas>
+    </div>
+    <button id="novaBtn" title="Nova Blast"><span id="novaFill"></span>💥</button>
+  </div>
+  <div id="canvasWrap">
+    <canvas id="game"></canvas>
+    <div id="comboPopup"></div>
+    <div id="overlay">
+      <h1>Game Over</h1>
+      <p>The orbit collapsed.</p>
+      <div class="score" id="finalScore">0</div>
+      <div class="best" id="bestScoreLine">Best: 0</div>
+      <button class="primary" id="retryBtn">Play Again</button>
+      <button class="primary" id="continueBtn" style="display:none;margin-top:10px;background:linear-gradient(135deg,#6bd6ff,#2f8fc7);">Watch Ad to Continue</button>
+    </div>
+    <div id="startScreen">
+      <h1>Orbit&nbsp;Merge</h1>
+      <p>Drop the orbs. Merge matching sizes into the next tier. Chain merges for combo bonus. Fill the Nova gauge to blast the board clear of your largest orb.</p>
+      <button class="primary" id="startBtn">Tap to Start</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- storage (safe fallback if sandboxed) ----------
+  var mem = {};
+  var storage = {
+    get: function(k){ try { return localStorage.getItem(k); } catch(e){ return mem[k] || null; } },
+    set: function(k,v){ try { localStorage.setItem(k,v); } catch(e){ mem[k]=v; } }
+  };
+
+  // ---------- config ----------
+  var TIERS = [
+    { r: 15, color: "#ff6b6b" },
+    { r: 21, color: "#ff9e6b" },
+    { r: 28, color: "#ffd06b" },
+    { r: 36, color: "#c7ff6b" },
+    { r: 45, color: "#6bffb0" },
+    { r: 55, color: "#6bd6ff" },
+    { r: 66, color: "#6b8cff" },
+    { r: 78, color: "#b06bff" },
+    { r: 91, color: "#ff6bd6" }
+  ];
+  var SPAWN_MAX_TIER = 3; // only tiers 0..3 spawn as drops
+  var GRAVITY = 0.5;
+  var WALL_DAMP = 0.35;
+  var FLOOR_DAMP = 0.3;
+  var AIR_FRICTION = 0.995;
+  var GROUND_FRICTION = 0.90;
+  var DROP_COOLDOWN = 380; // ms
+  var GAME_OVER_LINE_RATIO = 0.14; // fraction of playfield height from top
+  var GAME_OVER_HOLD_MS = 1200;
+  var COMBO_WINDOW_MS = 700;
+  var NOVA_MERGES_NEEDED = 6;
+
+  // ---------- canvas setup ----------
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var wrap = document.getElementById('canvasWrap');
+  var W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var WALL = 14;
+
+  function resize(){
+    var rect = wrap.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------- state ----------
+  var particles = [];
+  var score = 0;
+  var best = parseInt(storage.get('orbitmerge_best') || '0', 10);
+  var nextTier = randomSpawnTier();
+  var aimX = null;
+  var lastDropTime = 0;
+  var running = false;
+  var overLineTimer = 0;
+  var lastMergeTime = 0;
+  var comboCount = 0;
+  var novaMergeCount = 0;
+  var novaReady = false;
+  var idCounter = 1;
+
+  var scoreVal = document.getElementById('scoreVal');
+  var overlay = document.getElementById('overlay');
+  var startScreen = document.getElementById('startScreen');
+  var finalScoreEl = document.getElementById('finalScore');
+  var bestScoreLine = document.getElementById('bestScoreLine');
+  var comboPopup = document.getElementById('comboPopup');
+  var novaBtn = document.getElementById('novaBtn');
+  var novaFill = document.getElementById('novaFill');
+  var nextCanvas = document.getElementById('nextCanvas');
+  var nextCtx = nextCanvas.getContext('2d');
+  var continueBtn = document.getElementById('continueBtn');
+
+  function randomSpawnTier(){
+    // weighted toward smallest tiers
+    var weights = [40, 30, 20, 10];
+    var total = weights.reduce(function(a,b){return a+b;},0);
+    var r = Math.random() * total;
+    var acc = 0;
+    for (var i=0;i<weights.length;i++){
+      acc += weights[i];
+      if (r <= acc) return i;
+    }
+    return 0;
+  }
+
+  function drawOrb(g, x, y, r, color, glow){
+    var grad = g.createRadialGradient(x - r*0.3, y - r*0.3, r*0.1, x, y, r);
+    grad.addColorStop(0, "#ffffff");
+    grad.addColorStop(0.15, color);
+    grad.addColorStop(1, shade(color, -25));
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI*2);
+    g.fillStyle = grad;
+    if (glow){ g.shadowColor = color; g.shadowBlur = 18; }
+    g.fill();
+    g.shadowBlur = 0;
+    g.lineWidth = 1.5;
+    g.strokeStyle = "rgba(255,255,255,0.25)";
+    g.stroke();
+  }
+
+  function shade(hex, percent){
+    var num = parseInt(hex.slice(1),16);
+    var r = (num >> 16) + percent;
+    var g = (num >> 8 & 0x00FF) + percent;
+    var b = (num & 0x0000FF) + percent;
+    r = Math.max(Math.min(255,r),0);
+    g = Math.max(Math.min(255,g),0);
+    b = Math.max(Math.min(255,b),0);
+    return "#" + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
+  }
+
+  function renderNextPreview(){
+    nextCtx.clearRect(0,0,46,46);
+    var t = TIERS[nextTier];
+    var scale = Math.min(1, 18 / t.r);
+    drawOrb(nextCtx, 23, 23, t.r*scale, t.color, false);
+  }
+
+  function spawnParticle(x, tier){
+    var r = TIERS[tier].r;
+    particles.push({
+      id: idCounter++,
+      x: Math.max(WALL+r, Math.min(W-WALL-r, x)),
+      y: r + 4,
+      vx: 0, vy: 0,
+      r: r, tier: tier,
+      justSpawned: true,
+      settleTimer: 0
+    });
+  }
+
+  function tryDrop(x){
+    var now = performance.now();
+    if (!running) return;
+    if (now - lastDropTime < DROP_COOLDOWN) return;
+    lastDropTime = now;
+    spawnParticle(x, nextTier);
+    nextTier = randomSpawnTier();
+    renderNextPreview();
+  }
+
+  function triggerNova(){
+    if (!novaReady || particles.length === 0) return;
+    // remove the single largest particle for a burst of space + small score
+    var maxIdx = 0;
+    for (var i=1;i<particles.length;i++){
+      if (particles[i].r > particles[maxIdx].r) maxIdx = i;
+    }
+    var p = particles[maxIdx];
+    addScore(TIERS[p.tier === undefined ? 0 : p.tier] ? (p.tier+1)*5 : 5);
+    particles.splice(maxIdx,1);
+    novaMergeCount = 0;
+    novaReady = false;
+    updateNovaUI();
+    showCombo("NOVA BLAST", p.x, p.y);
+  }
+
+  function updateNovaUI(){
+    var pct = Math.min(100, (novaMergeCount / NOVA_MERGES_NEEDED) * 100);
+    novaFill.style.height = pct + "%";
+    novaBtn.classList.toggle('ready', novaReady);
+  }
+
+  function addScore(n){
+    score += Math.round(n);
+    scoreVal.textContent = score;
+  }
+
+  function showCombo(text, x, y){
+    comboPopup.textContent = text;
+    comboPopup.style.left = (x - 40) + "px";
+    comboPopup.style.top = (y - 20) + "px";
+    comboPopup.style.opacity = "1";
+    comboPopup.style.transform = "translateY(0px)";
+    comboPopup.style.transition = "none";
+    requestAnimationFrame(function(){
+      comboPopup.style.transition = "opacity .6s, transform .6s";
+      comboPopup.style.opacity = "0";
+      comboPopup.style.transform = "translateY(-30px)";
+    });
+  }
+
+  function physicsStep(){
+    var floorY = H - WALL;
+    // integrate
+    for (var i=0;i<particles.length;i++){
+      var p = particles[i];
+      p.vy += GRAVITY;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= AIR_FRICTION;
+    }
+
+    // wall / floor collisions
+    for (i=0;i<particles.length;i++){
+      p = particles[i];
+      if (p.x - p.r < WALL){ p.x = WALL + p.r; p.vx = -p.vx * WALL_DAMP; }
+      if (p.x + p.r > W - WALL){ p.x = W - WALL - p.r; p.vx = -p.vx * WALL_DAMP; }
+      if (p.y + p.r > floorY){
+        p.y = floorY - p.r;
+        p.vy = -p.vy * FLOOR_DAMP;
+        p.vx *= GROUND_FRICTION;
+        if (Math.abs(p.vy) < 0.6) p.vy = 0;
+        if (Math.abs(p.vx) < 0.05) p.vx = 0;
+      }
+    }
+
+    // pairwise collisions (few iterations for stack stability)
+    var merges = [];
+    for (var iter=0; iter<3; iter++){
+      for (i=0;i<particles.length;i++){
+        for (var j=i+1;j<particles.length;j++){
+          var a = particles[i], b = particles[j];
+          if (!a || !b) continue;
+          var dx = b.x - a.x, dy = b.y - a.y;
+          var dist = Math.sqrt(dx*dx+dy*dy) || 0.001;
+          var minDist = a.r + b.r;
+          if (dist < minDist){
+            if (a.tier === b.tier && a.tier < TIERS.length - 1 && iter === 0){
+              merges.push([a.id, b.id]);
+              continue;
+            }
+            var overlap = (minDist - dist) / 2;
+            var nx = dx / dist, ny = dy / dist;
+            a.x -= nx * overlap; a.y -= ny * overlap;
+            b.x += nx * overlap; b.y += ny * overlap;
+            var avx = (a.vx + b.vx) * 0.5 * 0.1;
+            var avy = (a.vy + b.vy) * 0.5 * 0.1;
+            a.vx -= avx*0.2; b.vx += avx*0.2;
+          }
+        }
+      }
+    }
+
+    // process merges (avoid double-processing same particle twice per frame)
+    if (merges.length){
+      var used = {};
+      var now = performance.now();
+      merges.forEach(function(pair){
+        var idA = pair[0], idB = pair[1];
+        if (used[idA] || used[idB]) return;
+        var ai = particles.findIndex(function(p){return p.id===idA;});
+        var bi = particles.findIndex(function(p){return p.id===idB;});
+        if (ai === -1 || bi === -1) return;
+        var a = particles[ai], b = particles[bi];
+        used[idA] = true; used[idB] = true;
+        var newTier = a.tier + 1;
+        var nx = (a.x + b.x)/2, ny = (a.y + b.y)/2;
+        // combo timing
+        if (now - lastMergeTime < COMBO_WINDOW_MS){ comboCount++; } else { comboCount = 1; }
+        lastMergeTime = now;
+        var comboMult = 1 + Math.min(comboCount-1, 5) * 0.5;
+        addScore((newTier+1) * 8 * comboMult);
+        if (comboCount >= 2) showCombo("x" + comboCount.toFixed(0) + " COMBO", nx, ny);
+        // remove a & b, add merged
+        particles = particles.filter(function(p){ return p.id !== idA && p.id !== idB; });
+        particles.push({
+          id: idCounter++, x: nx, y: ny, vx: 0, vy: -2,
+          r: TIERS[newTier].r, tier: newTier, justSpawned:false, settleTimer:0
+        });
+        novaMergeCount++;
+        if (novaMergeCount >= NOVA_MERGES_NEEDED){ novaReady = true; }
+        updateNovaUI();
+      });
+    }
+
+    // game-over check
+    var lineY = H * GAME_OVER_LINE_RATIO;
+    var anyOverLine = particles.some(function(p){
+      return (p.y - p.r) < lineY && Math.abs(p.vy) < 1.2 && !p.justSpawned;
+    });
+    particles.forEach(function(p){ if (p.justSpawned && p.y - p.r > lineY + 10) p.justSpawned = false; });
+
+    if (anyOverLine){
+      overLineTimer += 16.7;
+      if (overLineTimer > GAME_OVER_HOLD_MS) endGame();
+    } else {
+      overLineTimer = 0;
+    }
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+
+    // playfield border
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(WALL, WALL, W-WALL*2, H-WALL*2);
+
+    // game over line
+    var lineY = H * GAME_OVER_LINE_RATIO;
+    ctx.setLineDash([6,6]);
+    ctx.strokeStyle = "rgba(255,107,107,0.4)";
+    ctx.beginPath();
+    ctx.moveTo(WALL, lineY);
+    ctx.lineTo(W-WALL, lineY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // aim preview
+    if (running && aimX !== null){
+      var t = TIERS[nextTier];
+      var clampedX = Math.max(WALL+t.r, Math.min(W-WALL-t.r, aimX));
+      ctx.globalAlpha = 0.5;
+      drawOrb(ctx, clampedX, t.r+4, t.r, t.color, false);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.beginPath();
+      ctx.moveTo(clampedX, t.r*2+4);
+      ctx.lineTo(clampedX, H-WALL);
+      ctx.stroke();
+    }
+
+    particles.forEach(function(p){
+      drawOrb(ctx, p.x, p.y, p.r, TIERS[p.tier].color, p.tier >= TIERS.length-2);
+    });
+  }
+
+  var rafId = null;
+  function loop(){
+    if (running){
+      physicsStep();
+    }
+    render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  // ---------- ads (AdMob via Capacitor, native only; no-op in a plain browser) ----------
+  var TEST_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/1033173712";
+  var TEST_REWARDED_ID = "ca-app-pub-3940256099942544/5224354917";
+  // TODO before release: replace both IDs above with your real AdMob ad unit IDs.
+  var isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  var AdMobPlugin = isNative && window.Capacitor.Plugins ? window.Capacitor.Plugins.AdMob : null;
+  var adsReady = false;
+  var gameOverCount = 0;
+  var INTERSTITIAL_EVERY = 3; // show an interstitial every 3rd game-over, not every one
+  var continueUsedThisRun = false;
+
+  if (AdMobPlugin) {
+    AdMobPlugin.initialize({ initializeForTesting: true }).then(function () {
+      adsReady = true;
+      prepareInterstitial();
+      prepareRewarded();
+    }).catch(function (e) { console.warn('AdMob init failed', e); });
+  }
+
+  function prepareInterstitial(){
+    if (!AdMobPlugin) return;
+    AdMobPlugin.prepareInterstitial({ adId: TEST_INTERSTITIAL_ID }).catch(function(e){ console.warn('prepareInterstitial failed', e); });
+  }
+  function prepareRewarded(){
+    if (!AdMobPlugin) return;
+    AdMobPlugin.prepareRewardVideoAd({ adId: TEST_REWARDED_ID }).catch(function(e){ console.warn('prepareRewarded failed', e); });
+  }
+  function maybeShowInterstitial(){
+    if (!AdMobPlugin || !adsReady) return;
+    gameOverCount++;
+    if (gameOverCount % INTERSTITIAL_EVERY !== 0) return;
+    AdMobPlugin.showInterstitial().catch(function(e){ console.warn('showInterstitial failed', e); }).then(prepareInterstitial);
+  }
+  function offerContinue(){
+    if (!AdMobPlugin || !adsReady || continueUsedThisRun) return;
+    continueBtn.style.display = 'inline-block';
+  }
+  function watchAdToContinue(){
+    if (!AdMobPlugin) return;
+    continueUsedThisRun = true;
+    continueBtn.style.display = 'none';
+    AdMobPlugin.showRewardVideoAd().then(function(){
+      // reward earned: clear the two largest orbs to make room, then resume
+      particles.sort(function(a,b){ return b.r - a.r; });
+      particles.splice(0, Math.min(2, particles.length));
+      overLineTimer = 0;
+      overlay.classList.remove('show');
+      running = true;
+    }).catch(function(e){ console.warn('showRewardVideoAd failed', e); }).then(prepareRewarded);
+  }
+
+  function endGame(){
+    running = false;
+    if (score > best){ best = score; storage.set('orbitmerge_best', String(best)); }
+    finalScoreEl.textContent = score;
+    bestScoreLine.textContent = "Best: " + best;
+    overlay.classList.add('show');
+    continueBtn.style.display = 'none';
+    offerContinue();
+    maybeShowInterstitial();
+  }
+
+  function resetGame(){
+    particles = [];
+    score = 0;
+    scoreVal.textContent = "0";
+    nextTier = randomSpawnTier();
+    renderNextPreview();
+    overLineTimer = 0;
+    comboCount = 0;
+    lastMergeTime = 0;
+    novaMergeCount = 0;
+    novaReady = false;
+    updateNovaUI();
+    overlay.classList.remove('show');
+    continueBtn.style.display = 'none';
+    continueUsedThisRun = false;
+    running = true;
+  }
+
+  // ---------- input ----------
+  function getX(evt){
+    var rect = canvas.getBoundingClientRect();
+    var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    return clientX - rect.left;
+  }
+  canvas.addEventListener('mousemove', function(e){ aimX = getX(e); });
+  canvas.addEventListener('mousedown', function(e){ aimX = getX(e); tryDrop(aimX); });
+  canvas.addEventListener('touchstart', function(e){ e.preventDefault(); aimX = getX(e); }, {passive:false});
+  canvas.addEventListener('touchmove', function(e){ e.preventDefault(); aimX = getX(e); }, {passive:false});
+  canvas.addEventListener('touchend', function(e){ e.preventDefault(); if (aimX!==null) tryDrop(aimX); }, {passive:false});
+
+  novaBtn.addEventListener('click', triggerNova);
+  document.getElementById('retryBtn').addEventListener('click', resetGame);
+  continueBtn.addEventListener('click', watchAdToContinue);
+  document.getElementById('startBtn').addEventListener('click', function(){
+    startScreen.style.display = 'none';
+    resetGame();
+  });
+
+  // ---------- init ----------
+  resize();
+  renderNextPreview();
+  bestScoreLine.textContent = "Best: " + best;
+  loop();
+})();
+</script>
+</body>
+</html>

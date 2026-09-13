@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2732" height="2732" viewBox="0 0 2732 2732">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="#241a44"/>
+      <stop offset="70%" stop-color="#0a0716"/>
+    </radialGradient>
+    <radialGradient id="orbBig" cx="38%" cy="32%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#b06bff"/>
+      <stop offset="100%" stop-color="#6b2fd0"/>
+    </radialGradient>
+  </defs>
+  <rect width="2732" height="2732" fill="url(#bg)"/>
+  <circle cx="1366" cy="1266" r="340" fill="url(#orbBig)"/>
+  <circle cx="1366" cy="1266" r="340" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="8"/>
+  <text x="1366" y="1780" font-family="Segoe UI, Arial, sans-serif" font-size="120" font-weight="700" fill="#f2eefe" text-anchor="middle">Orbit Merge</text>
+</svg>
