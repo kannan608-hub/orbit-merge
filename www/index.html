@@ -143,6 +143,7 @@
   var GAME_OVER_HOLD_MS = 1200;
   var COMBO_WINDOW_MS = 700;
   var NOVA_MERGES_NEEDED = 6;
+  var FIXED_DT = 1000 / 60; // physics timestep in ms
 
   // ---------- canvas setup ----------
   var canvas = document.getElementById('game');
@@ -260,14 +261,14 @@
   }
 
   function triggerNova(){
-    if (!novaReady || particles.length === 0) return;
+    if (!running || !novaReady || particles.length === 0) return;
     // remove the single largest particle for a burst of space + small score
     var maxIdx = 0;
     for (var i=1;i<particles.length;i++){
       if (particles[i].r > particles[maxIdx].r) maxIdx = i;
     }
     var p = particles[maxIdx];
-    addScore(TIERS[p.tier === undefined ? 0 : p.tier] ? (p.tier+1)*5 : 5);
+    addScore((p.tier + 1) * 5);
     particles.splice(maxIdx,1);
     novaMergeCount = 0;
     novaReady = false;
@@ -392,7 +393,7 @@
     particles.forEach(function(p){ if (p.justSpawned && p.y - p.r > lineY + 10) p.justSpawned = false; });
 
     if (anyOverLine){
-      overLineTimer += 16.7;
+      overLineTimer += FIXED_DT;
       if (overLineTimer > GAME_OVER_HOLD_MS) endGame();
     } else {
       overLineTimer = 0;
@@ -437,9 +438,27 @@
   }
 
   var rafId = null;
-  function loop(){
+  var lastFrameTime = 0;
+  var stepAccumulator = 0;
+  var MAX_FRAME_MS = 100; // clamp after tab-away so we don't run hundreds of catch-up steps
+
+  function loop(now){
+    if (now === undefined) now = performance.now();
+    if (!lastFrameTime) lastFrameTime = now;
+    var elapsed = Math.min(now - lastFrameTime, MAX_FRAME_MS);
+    lastFrameTime = now;
+
     if (running){
-      physicsStep();
+      // Physics runs at a fixed 60Hz regardless of display refresh rate, so the game
+      // plays identically on 60Hz and 120Hz screens.
+      stepAccumulator += elapsed;
+      while (stepAccumulator >= FIXED_DT){
+        physicsStep();
+        stepAccumulator -= FIXED_DT;
+        if (!running) break; // endGame() fired mid-catch-up
+      }
+    } else {
+      stepAccumulator = 0;
     }
     render();
     rafId = requestAnimationFrame(loop);
@@ -479,8 +498,9 @@
     AdMobPlugin.showInterstitial().catch(function(e){ console.warn('showInterstitial failed', e); }).then(prepareInterstitial);
   }
   function offerContinue(){
-    if (!AdMobPlugin || !adsReady || continueUsedThisRun) return;
+    if (!AdMobPlugin || !adsReady || continueUsedThisRun) return false;
     continueBtn.style.display = 'inline-block';
+    return true;
   }
   function watchAdToContinue(){
     if (!AdMobPlugin) return;
@@ -503,8 +523,8 @@
     bestScoreLine.textContent = "Best: " + best;
     overlay.classList.add('show');
     continueBtn.style.display = 'none';
-    offerContinue();
-    maybeShowInterstitial();
+    // Never stack a full-screen interstitial on top of the rewarded-continue offer.
+    if (!offerContinue()) maybeShowInterstitial();
   }
 
   function resetGame(){

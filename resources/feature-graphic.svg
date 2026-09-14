@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <defs>
+    <radialGradient id="bg" cx="30%" cy="50%" r="90%">
+      <stop offset="0%" stop-color="#241a44"/>
+      <stop offset="70%" stop-color="#0a0716"/>
+    </radialGradient>
+    <radialGradient id="orbBig" cx="38%" cy="32%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#b06bff"/>
+      <stop offset="100%" stop-color="#6b2fd0"/>
+    </radialGradient>
+    <radialGradient id="orbMid" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#6bd6ff"/>
+      <stop offset="100%" stop-color="#2f8fc7"/>
+    </radialGradient>
+    <radialGradient id="orbSmall" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#ffd06b"/>
+      <stop offset="100%" stop-color="#d69a2f"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a98bff"/>
+      <stop offset="100%" stop-color="#ff9de2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="500" fill="url(#bg)"/>
+  <circle cx="830" cy="380" r="90" fill="url(#orbSmall)"/>
+  <circle cx="900" cy="180" r="70" fill="url(#orbMid)"/>
+  <circle cx="760" cy="150" r="130" fill="url(#orbBig)"/>
+  <circle cx="760" cy="150" r="130" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="4"/>
+  <text x="70" y="230" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="800" fill="url(#title)">Orbit Merge</text>
+  <text x="72" y="285" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="400" fill="#d9c9ff" opacity="0.85">Merge. Chain. Blast the board clear.</text>
+</svg>
