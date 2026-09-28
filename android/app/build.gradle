@@ -10,7 +10,7 @@ android {
     namespace = "com.orbitmerge.game"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.orbitmerge.game"
+        applicationId "com.kamalakannan.orbitmerge"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
